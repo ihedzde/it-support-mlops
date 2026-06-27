@@ -1,0 +1,19 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/tokenize_and_sample.py -i dataset/raw_tickets.csv -o 
+      dataset/sample_tickets.json
+    deps:
+    - path: dataset/raw_tickets.csv
+      hash: md5
+      md5: 51ea944b4aacc602185e03554eb5ad06
+      size: 14311326
+    - path: src/tokenize_and_sample.py
+      hash: md5
+      md5: e734cfb73ddc6c32ea489152002c47d5
+      size: 2124
+    outs:
+    - path: dataset/sample_tickets.json
+      hash: md5
+      md5: 321c01589e56e8681c235a214c1847b7
+      size: 39660

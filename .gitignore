@@ -27,13 +27,18 @@ __pycache__/
 # ⚙️ Local MLOps Infrastructure & Configuration
 .env
 .env.*
-week-2/docker/config/
+docker/config/
+
+# 📦 Dataset Files (tracked by DVC, not Git)
+dataset/*.csv
+dataset/annotated/*.json
+dataset/label_studio_tasks.json
 
 # 🗄️ Local Service Database & Emulator Volumes
-# Blocks local data directories from PostgreSQL and SeaweedFS
 .data/
 postgres-data/
 seaweed-data/
+minio-data/
 
 # 📋 Application Logs & Diagnostics
 *.log

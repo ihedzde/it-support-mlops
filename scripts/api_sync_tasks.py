@@ -17,10 +17,12 @@ import json
 import os
 import sys
 import requests
-
+# pyrefly: ignore [missing-import]
+from dotenv import load_dotenv
 # Try to load python-dotenv if available to read docker/.env
 try:
-    from dotenv import load_dotenv
+    # pyrefly: ignore [missing-import]
+   
     # Load from docker/.env
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docker", ".env")
     load_dotenv(env_path)

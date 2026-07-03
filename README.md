@@ -1,100 +1,122 @@
-# 🎫 IT Support Ticket Data — 3-Stage DVC Pipeline & Prod Labeling
+# 🎫 IT Support Ticket Classification MLOps Platform
 
-> **Topic:** Data Management in MLOps
->
-> **Goal:** Demonstrate a complete MLOps lifecycle (Immutable Data Lineage) using DVC Pipelines and automated API ingestion into a production-grade infrastructure.
+> **Goal:** A complete, production-grade MLOps lifecycle demonstrating immutable data lineage (DVC), containerized data labeling (Label Studio), distributed deep learning fine-tuning (Ray Train + DistilBERT), tracking (MLflow), and automated version promotion in a Model Registry.
 
 ---
 
 ## 🛠️ Project Overview
 
-### What tool was used for the markup?
-We use **[Label Studio](https://labelstud.io/)** as our primary data annotation and markup tool. It provides a highly customizable UI that allows annotators to read the text of an IT support ticket and classify it into specific departments (e.g., "Hardware Support", "Network Operations").
+This platform covers the full MLOps lifecycle:
 
-### How to run/open the markup tool?
-Label Studio is hosted locally via Docker Compose alongside a robust PostgreSQL database. To run it:
-1. Open your terminal in the project directory.
-2. Run `cd docker && docker compose up -d` to spin up the infrastructure.
-3. Open a web browser and navigate to `http://localhost:8080`.
-4. Log in using `admin@example.com` and the password `admin123`.
+```
+[Kaggle Source] ──► raw_tickets.csv (Stage 1)
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+    prepare (Stage 2)              train (Stage 4)
+             │                           │
+    sample_tickets.json                  ▼
+             │                   [Ray Torch Workers]
+             ▼                           │
+    [Label Studio API] (Stage 3)         ├── Fine-tune DistilBERT
+             │                           ├── Log metrics/params to MLflow
+    labeled_tickets.json (Gold)          └── Export best checkpoint
+                                                 │
+                                                 ▼
+                                       register_model (Stage 5)
+                                                 │
+                                                 ▼
+                                       [MLflow Model Registry]
+```
 
-### How does dataset versioning work?
-Data versioning is handled entirely by **[DVC (Data Version Control)](https://dvc.org/)**. 
-- Instead of manually tracking files like `dataset_v1.csv` or `dataset_final.json`, DVC cryptographically hashes every dataset file and stores it in a local **MinIO (S3-compatible) Vault**.
-- The `dvc.yaml` file acts as a pipeline: it tracks the transformation from the raw CSV source into the JSON format needed for Label Studio.
-- Finally, when markup is finished, we export the annotations back into the workspace and run `dvc add` and `dvc push` to safely lock the "Gold Standard" dataset into the cold-storage vault.
-
-### What tasks is this data planned for in the future?
-The labeled dataset (our "Gold Standard") is being prepared to train an **NLP (Natural Language Processing) Machine Learning model**. 
-In the future, this model will be deployed to automatically read incoming IT support tickets and predict which department they should be routed to, entirely eliminating the need for human triage agents.
+### Infrastructure Services (Docker Compose)
+All infrastructure runs locally and self-contained via Docker:
+- **Label Studio (`:8080`)**: Annotation interface.
+- **MinIO (`:9000/:9001`)**: Local S3 vault storing DVC datasets and MLflow model artifacts.
+- **PostgreSQL (`:5432`)**: Database backend for Label Studio and MLflow.
+- **MLflow Tracking Server (`:5001`)**: Centralized experiment tracker and Model Registry.
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### 1. Launch Prod Infrastructure
-Start PostgreSQL, MinIO, and Label Studio:
+### 1. Launch MLOps Stack
+Start PostgreSQL, MinIO, MLflow, and Label Studio:
 ```bash
 cd docker && docker compose up -d && cd ..
 python -m venv .venv
 source .venv/bin/activate
-pip install kaggle dvc "dvc[s3]" requests python-dotenv
+pip install -r requirements.txt
 ```
 
 ### 2. Stage 1: The Raw Source
-Download the raw data from Kaggle and freeze it with DVC.
+Download the raw data from Kaggle and track it with DVC:
 ```bash
 bash scripts/download_raw.sh
 dvc add dataset/raw_tickets.csv
 ```
 
-### 3. Stage 2: The DVC Pipeline (Transformation)
-Generate a sample payload for Label Studio using our reproducible pipeline:
+### 3. Stage 2: Data Preparation & Labeling (Optional)
+Generate a sample payload and ingest it into Label Studio:
 ```bash
-dvc repro
-```
-*DVC will automatically run `src/tokenize_and_sample.py` and generate `dataset/sample_tickets.json`.*
+# Run DVC prepare stage
+dvc repro prepare
 
-### 4. Stage 3: API Ingestion & Annotation
-Open http://localhost:8080 (admin@example.com / admin123) and create a project named **"IT Support Ticket Classification"** (ID: 1).
-
-Paste the following XML code into the project settings (Labeling Interface -> Code):
-```xml
-<View>
-  <Header value="IT Support Ticket" />
-  <Text name="text" value="$text" />
-  <Header value="Department Classification" />
-  <Choices name="department" toName="text" choice="single" showInline="true">
-    <Choice value="Technical Support" />
-    <Choice value="Network Operations" />
-    <Choice value="Software Development" />
-    <Choice value="Hardware Support" />
-    <Choice value="User Accounts" />
-    <Choice value="Billing &amp; Licensing" />
-  </Choices>
-</View>
-```
-
-**(Optional) Fetch your API Key:**
-Go to the top right corner of Label Studio -> **Account & Settings**. Copy your **Access Token** and paste it into your `docker/.env` file as `LABEL_STUDIO_AUTH_TOKEN`. *(Note: Our automated Python scripts use session login and actually bypass the need for this key, but it is good practice to configure it!)*
-
-Automatically push your tasks into the PostgreSQL database via our API script:
-```bash
+# Sync tasks into Label Studio (ensure Project ID 1 is created)
 python scripts/api_sync_tasks.py --project-id 1 --input dataset/sample_tickets.json
 ```
-*Complete some basic labeling on the tickets in the UI.*
-
-### 5. Exporting the "Gold Standard"
-Once labeling is complete, automatically pull the results from the database and push them into cold S3 storage:
+Once labeling is complete, export the annotations and lock them into S3 via DVC:
 ```bash
-# Pull labeled data via API
 python scripts/export_annotations.py --project-id 1
-
-# Lock the final dataset into DVC
 dvc add dataset/labeled_tickets.json
-git add dataset/labeled_tickets.json.dvc
-git commit -m "Update labeled dataset"
 dvc push
 ```
 
-You are all set! You have successfully built a perfect, automated MLOps data management platform. 🎯
+### 4. Stage 4: Model Training (Ray Train & DistilBERT)
+We fine-tune a pre-trained **DistilBERT** transformer model using **Ray Train** for distributed execution. All hyperparameters, validation curves, confusion matrices, and model weights are tracked automatically in MLflow.
+
+To configure parameters, edit [params.yaml](file:///Users/ihedz/it-support-mlops/params.yaml):
+```yaml
+train:
+  epochs: 1
+  batch_size: 16
+  learning_rate: 2e-5
+  max_length: 256
+  quick_test: true  # Set to false to train on the full 29K dataset!
+```
+
+Run the training pipeline stage using DVC:
+```bash
+dvc repro train
+```
+Or run the training script directly:
+```bash
+python src/train.py --input dataset/raw_tickets.csv --epochs 1 --batch-size 16 --quick-test false
+```
+
+### 5. Stage 5: Experiment Tracking & Model Registry
+Open the MLflow Tracking Server UI at **`http://localhost:5001`** to compare runs, inspect parameters, download evaluation plots, and examine saved model artifacts.
+
+#### Promoting Models
+To automatically fetch the best run from MLflow (using `test_f1_weighted`), register it, and promote it through lifecycle stages, use the registry helper script:
+
+```bash
+# Register the best model as 'Staging'
+python scripts/register_model.py
+
+# Register and promote directly to 'Production'
+python scripts/register_model.py --promote
+```
+
+---
+
+## 🎯 Verification & Local Testing
+
+Check training metrics logged by DVC:
+```bash
+dvc metrics show
+```
+
+Inspect generated plots:
+- Check out the confusion matrix plot at `plots/confusion_matrix.png`.
+- View the classification report at `plots/classification_report.txt`.

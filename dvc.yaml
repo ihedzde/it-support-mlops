@@ -7,3 +7,20 @@ stages:
     - src/tokenize_and_sample.py
     outs:
     - dataset/sample_tickets.json
+  train:
+    cmd: python src/train.py --input dataset/raw_tickets.csv --epochs ${train.epochs} --batch-size ${train.batch_size} --learning-rate ${train.learning_rate} --max-length ${train.max_length} --quick-test ${train.quick_test}
+    deps:
+    - dataset/raw_tickets.csv
+    - src/train.py
+    params:
+    - train.epochs
+    - train.batch_size
+    - train.learning_rate
+    - train.max_length
+    - train.quick_test
+    metrics:
+    - metrics.json:
+        cache: false
+    plots:
+    - plots/confusion_matrix.png:
+        cache: false

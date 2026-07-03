@@ -46,12 +46,15 @@ services:
         mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
         mc mb myminio/$${MINIO_BUCKET} --ignore-existing;
         mc anonymous set download myminio/$${MINIO_BUCKET};
-        echo '✅ Bucket $${MINIO_BUCKET} is ready';
+        mc mb myminio/$${MLFLOW_ARTIFACTS_BUCKET} --ignore-existing;
+        mc anonymous set download myminio/$${MLFLOW_ARTIFACTS_BUCKET};
+        echo '✅ Buckets are ready';
       "
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
+      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET}
     networks:
       - mlops-network
 
@@ -107,6 +110,54 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - mlops-network
+
+  # ----------------------------------------------------------
+  # PostgreSQL DB Init — Creates mlflow database if not exists
+  # ----------------------------------------------------------
+  postgres-init:
+    image: postgres:15
+    container_name: postgres-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        PGPASSWORD=$${POSTGRES_PASSWORD} psql -h postgres -U $${POSTGRES_USER} -d $${POSTGRES_DB} -c \"CREATE DATABASE mlflow;\" || echo \"mlflow DB already exists or failed to create\";
+      "
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - mlops-network
+
+  # ----------------------------------------------------------
+  # MLflow — Experiment Tracking and Model Registry
+  # UI: http://localhost:5001
+  # ----------------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
+    ports:
+      - "5001:5000"
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_S3_IGNORE_TLS: "true"
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      --default-artifact-root s3://${MLFLOW_ARTIFACTS_BUCKET}/
+      --host 0.0.0.0
+      --port 5000
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - mlops-network
 

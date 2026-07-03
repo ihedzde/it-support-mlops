@@ -17,3 +17,31 @@ stages:
       hash: md5
       md5: 321c01589e56e8681c235a214c1847b7
       size: 39660
+  train:
+    cmd: python src/train.py --input dataset/raw_tickets.csv --epochs 1 
+      --batch-size 16 --learning-rate 2e-05 --max-length 256 --quick-test true
+    deps:
+    - path: dataset/raw_tickets.csv
+      hash: md5
+      md5: 51ea944b4aacc602185e03554eb5ad06
+      size: 14311326
+    - path: src/train.py
+      hash: md5
+      md5: 874b70536041a6906f2641f8903ddd23
+      size: 15882
+    params:
+      params.yaml:
+        train.batch_size: 16
+        train.epochs: 1
+        train.learning_rate: 2e-05
+        train.max_length: 256
+        train.quick_test: true
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 17590d74500a8daf0195706a8fc94478
+      size: 182
+    - path: plots/confusion_matrix.png
+      hash: md5
+      md5: 3253764d046675dba863d6c2102288e1
+      size: 79557

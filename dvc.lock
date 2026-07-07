@@ -2,7 +2,7 @@ schema: '2.0'
 stages:
   prepare:
     cmd: python src/tokenize_and_sample.py -i dataset/raw_tickets.csv -o 
-      dataset/sample_tickets.json
+      dataset/sample_tickets.json -s 500
     deps:
     - path: dataset/raw_tickets.csv
       hash: md5
@@ -15,8 +15,8 @@ stages:
     outs:
     - path: dataset/sample_tickets.json
       hash: md5
-      md5: 321c01589e56e8681c235a214c1847b7
-      size: 39660
+      md5: e182ad0939960fa292ed3717b2da3bef
+      size: 392072
   train:
     cmd: python src/train.py --input dataset/raw_tickets.csv --epochs 1 
       --batch-size 16 --learning-rate 2e-05 --max-length 256 --quick-test true
@@ -27,8 +27,8 @@ stages:
       size: 14311326
     - path: src/train.py
       hash: md5
-      md5: 874b70536041a6906f2641f8903ddd23
-      size: 15882
+      md5: abfd26112583e909a69dc1211c27e3b3
+      size: 15884
     params:
       params.yaml:
         train.batch_size: 16
@@ -39,9 +39,9 @@ stages:
     outs:
     - path: metrics.json
       hash: md5
-      md5: 17590d74500a8daf0195706a8fc94478
+      md5: a29e165e697bafe7de217153be3041df
       size: 182
     - path: plots/confusion_matrix.png
       hash: md5
-      md5: 3253764d046675dba863d6c2102288e1
-      size: 79557
+      md5: 1ccaf255e46aa35d49e07dfe3902152e
+      size: 83468

@@ -75,9 +75,9 @@ def clean_and_prepare_data(input_csv, quick_test=False):
     df = df[df["Department"].isin(VALID_DEPARTMENTS)]
     
     if quick_test:
-        print("⚡ Quick test mode enabled: sampling 200 rows to speed up execution.")
+        print("⚡ Quick test mode enabled: sampling 2000 rows to speed up execution.")
         # Ensure we have representation of all classes in quick-test if possible, or just sample
-        df = df.sample(n=min(200, len(df)), random_state=42).reset_index(drop=True)
+        df = df.sample(n=min(2000, len(df)), random_state=42).reset_index(drop=True)
     
     print(f"📊 Cleaned dataset size: {len(df)} rows across {df['Department'].nunique()} classes.")
     

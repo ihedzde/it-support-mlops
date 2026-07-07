@@ -1,7 +1,6 @@
 stages:
   prepare:
-    cmd: python src/tokenize_and_sample.py -i dataset/raw_tickets.csv -o 
-      dataset/sample_tickets.json
+    cmd: python src/tokenize_and_sample.py -i dataset/raw_tickets.csv -o dataset/sample_tickets.json -s 500
     deps:
     - dataset/raw_tickets.csv
     - src/tokenize_and_sample.py

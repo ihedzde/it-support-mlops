@@ -108,10 +108,37 @@ python scripts/register_model.py
 python scripts/register_model.py --promote
 ```
 
+### 6. Stage 6: Model Serving & Inference API (FastAPI + Docker)
+Deploy the REST API serving the registered model:
+```bash
+# Build and run the serving container
+cd docker && docker compose up -d --build inference-api && cd ..
+```
+
 ---
 
 ## 🎯 Verification & Local Testing
 
+### Health Check
+```bash
+curl http://localhost:8000/health
+```
+
+### Single Prediction
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"text": "My laptop screen is flickering and I cannot work"}'
+```
+
+### Batch Prediction
+```bash
+curl -X POST http://localhost:8000/predict/batch \
+  -H "Content-Type: application/json" \
+  -d '{"texts": ["Cannot connect to VPN", "I need a refund for my order"]}'
+```
+
+### Visualizing Metrics & Plots
 Check training metrics logged by DVC:
 ```bash
 dvc metrics show
@@ -120,3 +147,4 @@ dvc metrics show
 Inspect generated plots:
 - Check out the confusion matrix plot at `plots/confusion_matrix.png`.
 - View the classification report at `plots/classification_report.txt`.
+

@@ -147,17 +147,42 @@ services:
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       MLFLOW_S3_IGNORE_TLS: "true"
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
     command: >
       mlflow server
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
       --default-artifact-root s3://${MLFLOW_ARTIFACTS_BUCKET}/
       --host 0.0.0.0
       --port 5000
+      --allowed-hosts "*"
     depends_on:
       postgres-init:
         condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
+    networks:
+      - mlops-network
+
+  # ----------------------------------------------------------
+  # Inference API — FastAPI serving model from MLflow registry
+  # API: http://localhost:8000
+  # ----------------------------------------------------------
+  inference-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.serve
+    container_name: inference-api
+    ports:
+      - "8000:8000"
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_IGNORE_TLS: "true"
+    depends_on:
+      mlflow:
+        condition: service_started
     networks:
       - mlops-network
 

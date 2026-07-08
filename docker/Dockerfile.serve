@@ -5,7 +5,8 @@ WORKDIR /app
 
 # Install pip dependencies
 COPY docker/requirements-serve.txt .
-RUN pip install --no-cache-dir -r requirements-serve.txt
+RUN pip install --no-cache-dir -r requirements-serve.txt --extra-index-url https://download.pytorch.org/whl/cpu
+
 
 # Copy source code
 COPY src/ ./src/

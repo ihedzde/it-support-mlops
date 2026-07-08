@@ -115,7 +115,34 @@ Deploy the REST API serving the registered model:
 cd docker && docker compose up -d --build inference-api && cd ..
 ```
 
+### 7. Stage 7: Monitoring & Observability (Prometheus + Grafana + Evidently)
+The serving service collects Prometheus metrics and supports drift detection.
+
+#### Start Monitoring Stack
+Launch all services including Prometheus, Grafana, and the instrumented Inference API:
+```bash
+cd docker && docker compose up -d --build && cd ..
+```
+
+This launches:
+- **FastAPI Inference Service (`:8000`)**
+- **Prometheus (`:9090`)** — Scrapes API metrics every 5 seconds.
+- **Grafana (`:3000`)** — Auto-configured with Prometheus datasource and dashboard. Credentials: `admin` / `admin`.
+
+#### View Dashboard
+Open **`http://localhost:3000`** in your browser, log in, and view the **ML Model Monitoring** dashboard for:
+- **Predictions per Minute (RPS)**
+- **Average Processing Time (Latency)**
+- **Model Loaded Status**
+
+#### Request Drift Report
+Trigger Evidently's drift report comparing prediction text inputs against the reference dataset (`dataset/raw_tickets.csv`):
+```bash
+curl http://localhost:8000/drift/report
+```
+
 ---
+
 
 ## 🎯 Verification & Local Testing
 

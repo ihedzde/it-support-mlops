@@ -1,11 +1,14 @@
 import os
 import json
+import time
 import pandas as pd
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import mlflow
 from mlflow import MlflowClient
+from prometheus_client import Counter, Histogram, Gauge, make_asgi_app
+from src.drift import DriftDetector
 
 # Environment defaults for MLflow
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "minioadmin")
@@ -17,6 +20,25 @@ os.environ.setdefault("MLFLOW_S3_IGNORE_TLS", "true")
 MODEL_NAME = "it-support-classifier"
 model = None
 label_mapping = {}
+
+# Prometheus instrumentation
+PREDICTION_REQUESTS = Counter(
+    "prediction_requests_total",
+    "Total number of prediction requests",
+    ["endpoint", "status"]
+)
+PREDICTION_LATENCY = Histogram(
+    "prediction_latency_seconds",
+    "Prediction latency in seconds",
+    ["endpoint"]
+)
+MODEL_LOADED = Gauge(
+    "model_loaded",
+    "Model loaded status (1 = loaded, 0 = not loaded)"
+)
+
+# Drift detection initialization
+drift_detector = DriftDetector(reference_path="dataset/raw_tickets.csv")
 
 def get_department_name(pred_label: str) -> str:
     # ponytail: decode pipeline LABEL_X to human name using label_mapping.json
@@ -62,9 +84,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Warning: could not download label_mapping: {e}")
             
+    # Set model loaded gauge status
+    MODEL_LOADED.set(1 if model is not None else 0)
     yield
 
 app = FastAPI(title="IT Support Ticket Classifier API", lifespan=lifespan)
+
+# Mount Prometheus metrics endpoint
+app.mount("/metrics", make_asgi_app())
 
 class PredictionRequest(BaseModel):
     text: str
@@ -83,6 +110,10 @@ class BatchPredictionResponse(BaseModel):
 def health():
     return {"status": "ok", "model_loaded": model is not None}
 
+@app.get("/drift/report")
+def drift_report():
+    return drift_detector.calculate_drift()
+
 def predict_internal(text: str) -> PredictionResponse:
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
@@ -95,12 +126,37 @@ def predict_internal(text: str) -> PredictionResponse:
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
-    return predict_internal(request.text)
+    start_time = time.perf_counter()
+    status = "success"
+    try:
+        response = predict_internal(request.text)
+        drift_detector.add_prediction(request.text)
+        return response
+    except Exception as e:
+        status = "error"
+        raise e
+    finally:
+        latency = time.perf_counter() - start_time
+        PREDICTION_REQUESTS.labels(endpoint="predict", status=status).inc()
+        PREDICTION_LATENCY.labels(endpoint="predict").observe(latency)
 
 @app.post("/predict/batch", response_model=BatchPredictionResponse)
 def predict_batch(request: BatchPredictionRequest):
-    predictions = [predict_internal(text) for text in request.texts]
-    return BatchPredictionResponse(predictions=predictions)
+    start_time = time.perf_counter()
+    status = "success"
+    try:
+        predictions = []
+        for text in request.texts:
+            predictions.append(predict_internal(text))
+            drift_detector.add_prediction(text)
+        return BatchPredictionResponse(predictions=predictions)
+    except Exception as e:
+        status = "error"
+        raise e
+    finally:
+        latency = time.perf_counter() - start_time
+        PREDICTION_REQUESTS.labels(endpoint="predict_batch", status=status).inc()
+        PREDICTION_LATENCY.labels(endpoint="predict_batch").observe(latency)
 
 if __name__ == "__main__":
     # ponytail: inline runnable check for decoding logic
@@ -108,3 +164,4 @@ if __name__ == "__main__":
     assert get_department_name("LABEL_5") == "Product Support"
     assert get_department_name("LABEL_99") == "LABEL_99"
     print("Self-test passed!")
+

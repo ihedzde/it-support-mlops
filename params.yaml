@@ -1,0 +1,6 @@
+train:
+  epochs: 1
+  batch_size: 16
+  learning_rate: 2e-5
+  max_length: 256
+  quick_test: true

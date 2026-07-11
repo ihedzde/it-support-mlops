@@ -50,3 +50,14 @@ minio-data/
 # 🖥️ Operating System Artifacts
 .DS_Store
 Thumbs.db
+
+# 🧠 ML Training Artifacts
+mlruns/
+mlartifacts/
+models/
+ray_results/
+plots/
+metrics.json
+*.pt
+*.bin
+*.safetensors

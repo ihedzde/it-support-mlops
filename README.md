@@ -1,6 +1,6 @@
 # 🎫 IT Support Ticket Classification MLOps Platform
 
-> **Goal:** A complete, production-grade MLOps lifecycle demonstrating immutable data lineage (DVC), containerized data labeling (Label Studio), distributed deep learning fine-tuning (Ray Train + DistilBERT), tracking (MLflow), and automated version promotion in a Model Registry.
+> **Goal:** A complete, production-grade MLOps lifecycle demonstrating immutable data lineage (DVC), containerized data labeling (Label Studio), distributed deep learning fine-tuning (Ray Train + DistilBERT), tracking (MLflow), automated version promotion in a Model Registry, and CI/CD pipelines (GitHub Actions).
 
 ---
 
@@ -140,6 +140,50 @@ Trigger Evidently's drift report comparing prediction text inputs against the re
 ```bash
 curl http://localhost:8000/drift/report
 ```
+
+### 8. Stage 8: CI/CD Pipeline (GitHub Actions)
+The project includes a fully automated CI/CD pipeline that orchestrates model training and deployment.
+
+#### Pipeline Architecture
+```
+┌─────────────┐     ┌──────────────────────┐     ┌──────────────────────────┐
+│   Trigger    │────►│   Job 1: Train        │────►│   Job 2: Deploy          │
+│              │     │                      │     │   (skipped on PRs)       │
+│ • push main  │     │ 1. Setup Python      │     │                          │
+│ • PR to main │     │ 2. Launch infra      │     │ 1. Launch full stack     │
+│ • manual     │     │ 3. Download dataset  │     │ 2. Build inference API   │
+│ • schedule   │     │ 4. Train model       │     │ 3. Smoke test /health    │
+│              │     │ 5. Register in MLflow│     │ 4. Smoke test /predict   │
+└─────────────┘     │ 6. Upload artifacts  │     │ 5. Report status         │
+                    └──────────────────────┘     └──────────────────────────┘
+```
+
+#### Triggers
+
+| Trigger | Event | Behavior |
+|---------|-------|----------|
+| **Push** | Merge to `main` | Full train + deploy pipeline |
+| **Pull Request** | PR targeting `main` | Quick-test training only (validation) |
+| **Manual** | `workflow_dispatch` | Configurable epochs, quick_test, promote |
+| **Schedule** | `cron: 0 6 * * 1` | Weekly retrain every Monday at 06:00 UTC |
+
+#### Required GitHub Secrets
+Configure these in **Settings → Secrets and variables → Actions**:
+
+| Secret | Purpose |
+|--------|---------|
+| `KAGGLE_TOKEN` | Kaggle API token (`KGAT_...`) for dataset download |
+
+#### Manual Trigger
+1. Go to **Actions** tab → **ML Pipeline — Train & Deploy**
+2. Click **Run workflow**
+3. Configure inputs (epochs, quick_test, promote_to_production)
+4. Click **Run workflow** to start
+
+#### Viewing Results
+- **Run logs**: Click on a completed workflow run to see step-by-step logs
+- **Artifacts**: Training metrics and plots are uploaded as run artifacts (downloadable)
+- **Workflow file**: [`.github/workflows/ml-pipeline.yml`](.github/workflows/ml-pipeline.yml)
 
 ---
 
